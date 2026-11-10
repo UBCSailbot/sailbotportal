@@ -1,7 +1,7 @@
 # Interview tags and Google Docs notes (issue 15)
 
 Author: Beam Tantivongsakij
-Status: Implementing; user approved existing-subteam tags, multiple tags, and one document link per per-team application.
+Status: Implemented and locally validated; upstream submission blocked by write access; user approved existing-subteam tags, multiple tags, and one document link per per-team application.
 Date: 2026-11-09
 
 ## Overview and scope
