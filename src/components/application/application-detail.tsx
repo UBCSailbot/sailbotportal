@@ -8,6 +8,7 @@ import { NotesPanel } from '@/components/notes/notes-panel';
 import { AnswerView } from './answer-view';
 import { DetailPanes } from './detail-panes';
 import { ResumeViewer } from './resume-viewer';
+import { InterviewMetadata } from './interview-metadata';
 
 /**
  * The contents of one application's board-framed modal.
@@ -130,6 +131,15 @@ export function ApplicationDetailView({
           </p>
         ) : null}
       </header>
+
+      <InterviewMetadata
+        key={detail.id}
+        applicationId={detail.id}
+        teamSlug={detail.teamSlug}
+        initialTags={detail.interviewTags}
+        tagOptions={detail.interviewTagOptions}
+        initialNotesUrl={detail.interviewNotesUrl}
+      />
 
       <DetailPanes
         answers={<Answers detail={detail} />}

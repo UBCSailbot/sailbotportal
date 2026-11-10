@@ -420,6 +420,7 @@ describe('the card payload', () => {
       statusChangedAt: expect.any(String),
       noteCount: 3,
       assignedSubteamId: null,
+      interviewTags: [],
     });
   });
 
@@ -665,5 +666,56 @@ describe('detail navigation', () => {
     );
 
     expect(navigation).toEqual({ previousId: null, nextId: null });
+  });
+});
+
+describe('interview tags', () => {
+  it('filters by reviewer interest without losing the other tags or changing preferences', async () => {
+    const ada = applications['Ada Bell'];
+    const axel = applications['Axel Byrne'];
+    const path = subteams['test-board-path'];
+    const net = subteams['test-board-net'];
+    const { error } = await softLead.from('application_interview_tags').insert([
+      { application_id: ada, subteam_id: path },
+      { application_id: ada, subteam_id: net },
+      { application_id: axel, subteam_id: net },
+    ]);
+    expect(error).toBeNull();
+    try {
+      const cards = await getBoardApplications(
+        softPostingId,
+        withFilters({ interviewSubteamId: path }),
+        softLead,
+      );
+      expect(cards.map((card) => card.id)).toEqual([ada]);
+      expect(cards[0].interviewTags.map((tag) => tag.id).sort()).toEqual([path, net].sort());
+      expect(cards[0].firstChoiceSubteam?.id).toBe(path);
+      const both = await getBoardApplications(
+        softPostingId,
+        withFilters({ interviewSubteamId: net }),
+        softLead,
+      );
+      expect(both.map((card) => card.id)).toEqual([ada, axel]);
+      const neighbours = await getBoardApplicationNavigation(
+        softPostingId,
+        ada,
+        withFilters({ interviewSubteamId: net }),
+        softLead,
+      );
+      expect(neighbours).toEqual({ previousId: null, nextId: axel });
+      expect(
+        await getBoardApplications(
+          softPostingId,
+          withFilters({ interviewSubteamId: crypto.randomUUID() }),
+          softLead,
+        ),
+      ).toEqual([]);
+    } finally {
+      const { error: cleanupError } = await admin
+        .from('application_interview_tags')
+        .delete()
+        .in('application_id', [ada, axel]);
+      if (cleanupError) throw cleanupError;
+    }
   });
 });

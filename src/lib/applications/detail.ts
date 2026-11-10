@@ -58,6 +58,9 @@ export type ApplicationDetail = {
   /** In the applicant's own order of preference. Empty for teams that do not rank. */
   rankedSubteams: BoardSubteam[];
   assignedSubteam: BoardSubteam | null;
+  interviewTags: BoardSubteam[];
+  interviewTagOptions: BoardSubteam[];
+  interviewNotesUrl: string | null;
   answers: AnswerMap;
   questions: SnapshotEntry[];
   notes: ApplicationNote[];
@@ -88,8 +91,10 @@ type DetailRow = {
   question_schema_snapshot: unknown;
   status: string;
   assigned_subteam_id: string | null;
+  interview_notes_url: string | null;
+  application_interview_tags: { subteam_id: string }[];
   submitted_at: string;
-  postings: { title: string; teams: { slug: string } | null } | null;
+  postings: { title: string; team_id: string; teams: { slug: string } | null } | null;
 };
 
 /** Null when the row does not exist OR the caller may not see it — the same answer. */
@@ -105,7 +110,8 @@ export async function getApplicationDetail(
         // `question_schema` is deliberately NOT selected. The questions come from
         // `question_schema_snapshot` above; not fetching the live column means the
         // "simplification" that would break this cannot be made by accident.
-        'status, assigned_subteam_id, submitted_at, postings(title, teams(slug))',
+        'status, assigned_subteam_id, interview_notes_url, submitted_at, ' +
+        'application_interview_tags(subteam_id), postings(title, team_id, teams(slug))',
     )
     .eq('id', applicationId)
     .maybeSingle();
@@ -121,11 +127,13 @@ export async function getApplicationDetail(
   const subteamIds = [
     ...(row.ranked_subteams ?? []),
     ...(row.assigned_subteam_id ? [row.assigned_subteam_id] : []),
+    ...(row.application_interview_tags ?? []).map((tag) => tag.subteam_id),
   ];
-  const [subteams, siblings, notes] = await Promise.all([
+  const [subteams, siblings, notes, interviewTagOptions] = await Promise.all([
     loadSubteams(supabase, subteamIds),
     loadSiblings(supabase, row.submission_id, row.id),
     getApplicationNotes(row.id, supabase),
+    loadInterviewTagOptions(supabase, row.postings?.team_id ?? null),
   ]);
 
   return {
@@ -152,6 +160,12 @@ export async function getApplicationDetail(
     assignedSubteam: row.assigned_subteam_id
       ? (subteams.get(row.assigned_subteam_id) ?? null)
       : null,
+    interviewTags: (row.application_interview_tags ?? [])
+      .map((tag) => subteams.get(tag.subteam_id))
+      .filter((tag): tag is BoardSubteam => tag !== undefined)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+    interviewTagOptions,
+    interviewNotesUrl: row.interview_notes_url,
     answers: (row.answers ?? {}) as AnswerMap,
     questions: readSnapshot(row.question_schema_snapshot),
     notes,
@@ -198,6 +212,24 @@ async function loadSubteams(
   return new Map(
     (data ?? []).map((row) => [row.id, { id: row.id, name: row.name, code: row.code }]),
   );
+}
+
+async function loadInterviewTagOptions(
+  supabase: SupabaseClient<Database>,
+  teamId: string | null,
+): Promise<BoardSubteam[]> {
+  if (!teamId) return [];
+  const { data, error } = await supabase
+    .from('subteams')
+    .select('id, name, code')
+    .eq('team_id', teamId)
+    .eq('active', true)
+    .order('position');
+  if (error) {
+    console.error('[application] interview tag choices failed', { message: error.message });
+    throw new Error('Could not load this application.');
+  }
+  return data ?? [];
 }
 
 type SiblingRow = {

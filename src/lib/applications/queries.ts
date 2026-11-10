@@ -7,8 +7,8 @@ import type { Database } from '@/lib/supabase/types';
  * Two things shape every decision in this file.
  *
  * FIRST, THE BOARD IS A LIST OF CARDS, NOT A LIST OF APPLICATIONS. A card shows
- * five things — name, year and home department, first-choice subteam,
- * days-in-column, note count — so this returns those and nothing else. In
+ * compact summaries — identity, subteam preference, interview tags,
+ * days-in-column and note count — so this returns those and nothing else. In
  * particular it returns NEITHER `answers` NOR `question_schema_snapshot`. Those
  * two columns are the bulk of an application row: a Software snapshot is eight
  * questions including a twenty-row skills matrix, and a board of three hundred
@@ -69,6 +69,8 @@ export type BoardCard = {
   noteCount: number;
   /** Set once a lead places the applicant; the card shows it instead of first choice. */
   assignedSubteamId: string | null;
+  /** Reviewer interest, independent of preference or final placement. */
+  interviewTags: BoardSubteam[];
 };
 
 /**
@@ -82,6 +84,7 @@ export type BoardCard = {
 export type BoardFilters = {
   /** Applicants who ranked this subteam FIRST. Not "ranked it anywhere". */
   firstChoiceSubteamId: string | null;
+  interviewSubteamId: string | null;
   /** Inclusive lower bound on `submitted_at`, as a UTC calendar day. */
   submittedFrom: string | null;
   /** Inclusive upper bound on `submitted_at`, as a UTC calendar day. */
@@ -92,6 +95,7 @@ export type BoardFilters = {
 
 export const EMPTY_BOARD_FILTERS: BoardFilters = {
   firstChoiceSubteamId: null,
+  interviewSubteamId: null,
   submittedFrom: null,
   submittedTo: null,
   search: null,
@@ -103,6 +107,7 @@ export const EMPTY_BOARD_FILTERS: BoardFilters = {
  */
 export const BOARD_FILTER_PARAMS = {
   firstChoiceSubteamId: 'subteam',
+  interviewSubteamId: 'interviewTag',
   submittedFrom: 'from',
   submittedTo: 'to',
   search: 'q',
@@ -144,12 +149,15 @@ function firstValue(input: SearchParamsInput, key: string): string | null {
  */
 export function parseBoardFilters(input: SearchParamsInput): BoardFilters {
   const subteam = firstValue(input, BOARD_FILTER_PARAMS.firstChoiceSubteamId);
+  const interviewSubteam = firstValue(input, BOARD_FILTER_PARAMS.interviewSubteamId);
   const from = firstValue(input, BOARD_FILTER_PARAMS.submittedFrom);
   const to = firstValue(input, BOARD_FILTER_PARAMS.submittedTo);
   const search = firstValue(input, BOARD_FILTER_PARAMS.search);
 
   return {
     firstChoiceSubteamId: subteam !== null && UUID.test(subteam) ? subteam : null,
+    interviewSubteamId:
+      interviewSubteam !== null && UUID.test(interviewSubteam) ? interviewSubteam : null,
     submittedFrom: from !== null && isCalendarDay(from) ? from : null,
     submittedTo: to !== null && isCalendarDay(to) ? to : null,
     search: search === null ? null : search.slice(0, MAX_SEARCH_LENGTH),
@@ -166,6 +174,9 @@ export function serialiseBoardFilters(filters: BoardFilters): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.firstChoiceSubteamId !== null) {
     params.set(BOARD_FILTER_PARAMS.firstChoiceSubteamId, filters.firstChoiceSubteamId);
+  }
+  if (filters.interviewSubteamId !== null) {
+    params.set(BOARD_FILTER_PARAMS.interviewSubteamId, filters.interviewSubteamId);
   }
   if (filters.submittedFrom !== null) {
     params.set(BOARD_FILTER_PARAMS.submittedFrom, filters.submittedFrom);
@@ -246,6 +257,7 @@ type BoardRow = {
   status_changed_at: string;
   assigned_subteam_id: string | null;
   first_choice_subteam_id: string | null;
+  application_interview_tags: { subteam_id: string }[];
   // `table(count)` comes back as a one-element array of aggregates, and as a
   // bare object under some PostgREST versions. Both are handled.
   application_notes: { count: number }[] | { count: number } | null;
@@ -295,7 +307,11 @@ export async function getBoardApplications(
     .from('applications')
     .select(
       'id, applicant_name, year_of_study, home_department, status, status_changed_at, ' +
-        'assigned_subteam_id, first_choice_subteam_id, application_notes(count)',
+        'assigned_subteam_id, first_choice_subteam_id, application_notes(count), ' +
+        'application_interview_tags(subteam_id)' +
+        (filters.interviewSubteamId !== null
+          ? ', tag_filter:application_interview_tags!inner(subteam_id)'
+          : ''),
     )
     .eq('posting_id', postingId);
 
@@ -304,6 +320,10 @@ export async function getBoardApplications(
     // `ranked_subteams @> {id}` would also return everyone who ranked it
     // second or third, which is a different question with a similar answer.
     query = query.eq('first_choice_subteam_id', filters.firstChoiceSubteamId);
+  }
+
+  if (filters.interviewSubteamId !== null) {
+    query = query.eq('tag_filter.subteam_id', filters.interviewSubteamId);
   }
 
   if (filters.submittedFrom !== null) {
@@ -353,17 +373,16 @@ export async function getBoardApplications(
     statusChangedAt: row.status_changed_at,
     noteCount: noteCountOf(row),
     assignedSubteamId: row.assigned_subteam_id,
+    interviewTags: (row.application_interview_tags ?? [])
+      .map((tag) => subteams.get(tag.subteam_id))
+      .filter((tag): tag is BoardSubteam => tag !== undefined)
+      .sort((a, b) => a.name.localeCompare(b.name)),
   }));
 }
 
 /**
- * Names for the first choices actually present in this page of cards.
- *
- * A separate small query rather than an embed: `ranked_subteams` is a plain
- * uuid[] with no foreign key, so there is no relationship for PostgREST to
- * follow, and the generated column deliberately did not add one either. At most
- * six rows come back per team, and `subteams` is world-readable, so this is
- * cheap and needs no privileges of its own.
+ * Resolve first choices and interview tags together in one lookup, including
+ * inactive records whose existing tags must remain visible and removable.
  */
 async function loadSubteams(
   client: SupabaseClient<Database>,
@@ -371,7 +390,10 @@ async function loadSubteams(
 ): Promise<Map<string, BoardSubteam>> {
   const ids = [
     ...new Set(
-      rows.map((row) => row.first_choice_subteam_id).filter((id): id is string => id !== null),
+      rows.flatMap((row) => [
+        ...(row.first_choice_subteam_id ? [row.first_choice_subteam_id] : []),
+        ...(row.application_interview_tags ?? []).map((tag) => tag.subteam_id),
+      ]),
     ),
   ];
 

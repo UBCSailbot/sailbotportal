@@ -28,6 +28,7 @@ describe('parseBoardFilters', () => {
       ),
     ).toEqual({
       firstChoiceSubteamId: SUBTEAM,
+      interviewSubteamId: null,
       submittedFrom: '2026-01-01',
       submittedTo: '2026-02-28',
       search: 'jane',
@@ -41,6 +42,7 @@ describe('parseBoardFilters', () => {
     expect(parseBoardFilters({ subteam: SUBTEAM, q: 'jane', from: undefined })).toEqual({
       ...EMPTY_BOARD_FILTERS,
       firstChoiceSubteamId: SUBTEAM,
+      interviewSubteamId: null,
       search: 'jane',
     });
   });
@@ -115,6 +117,7 @@ describe('serialiseBoardFilters', () => {
   it('writes the documented parameter names', () => {
     const filters: BoardFilters = {
       firstChoiceSubteamId: SUBTEAM,
+      interviewSubteamId: null,
       submittedFrom: '2026-01-01',
       submittedTo: '2026-02-28',
       search: 'jane chen',
@@ -134,6 +137,7 @@ describe('serialiseBoardFilters', () => {
       search: 'jane',
       submittedTo: '2026-02-28',
       firstChoiceSubteamId: SUBTEAM,
+      interviewSubteamId: null,
       submittedFrom: '2026-01-01',
     };
     expect(serialiseBoardFilters(filters).toString()).toBe(
@@ -145,10 +149,29 @@ describe('serialiseBoardFilters', () => {
   it('round-trips through parse unchanged', () => {
     const filters: BoardFilters = {
       firstChoiceSubteamId: SUBTEAM,
+      interviewSubteamId: null,
       submittedFrom: '2026-01-01',
       submittedTo: '2026-02-28',
       search: 'a_b + c%',
     };
     expect(parseBoardFilters(serialiseBoardFilters(filters))).toEqual(filters);
+  });
+});
+
+describe('interview tag filter', () => {
+  it('keeps interview interest separate from applicant first choice', () => {
+    const interviewTag = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    const filters = parseBoardFilters({ subteam: SUBTEAM, interviewTag });
+    expect(filters.firstChoiceSubteamId).toBe(SUBTEAM);
+    expect(filters.interviewSubteamId).toBe(interviewTag);
+    expect(parseBoardFilters(serialiseBoardFilters(filters))).toEqual(filters);
+    expect(serialiseBoardFilters(filters).get('interviewTag')).toBe(interviewTag);
+  });
+
+  it('ignores malformed IDs and accepts the first repeated interview tag', () => {
+    expect(parseBoardFilters({ interviewTag: 'eq.other' }).interviewSubteamId).toBeNull();
+    expect(parseBoardFilters({ interviewTag: [SUBTEAM, 'other'] }).interviewSubteamId).toBe(
+      SUBTEAM,
+    );
   });
 });

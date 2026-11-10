@@ -45,6 +45,7 @@ function card(overrides: Partial<BoardCard> = {}): BoardCard {
     statusChangedAt: '2026-08-05T12:00:00.000Z',
     noteCount: 0,
     assignedSubteamId: null,
+    interviewTags: [],
     ...overrides,
   };
 }
@@ -261,4 +262,13 @@ describe('the card', () => {
     expect(within(applied).queryByText(/resume/i)).not.toBeInTheDocument();
     expect(applied.textContent).not.toContain('ada_bell@');
   });
+});
+
+it('shows interview tags independently of first choice and final placement', () => {
+  renderBoard([
+    card({ firstChoiceSubteam: PATH, assignedSubteamId: HULL.id, interviewTags: [NET] }),
+  ]);
+  expect(screen.getByText('Hull')).toBeInTheDocument();
+  expect(screen.getByLabelText('Interview tags')).toHaveTextContent('SOFT-NET');
+  expect(screen.getByText(/assigned subteam/)).toBeInTheDocument();
 });

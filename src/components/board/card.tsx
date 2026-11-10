@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { interviewTagLabel } from '@/lib/applications/interview-metadata';
 import { appendBoardQuery } from '@/lib/applications/navigation';
 import type { BoardCard as BoardCardData, BoardSubteam } from '@/lib/applications/queries';
 import { daysInColumn, daysInColumnLabel, shortYearLabel } from './columns';
@@ -10,10 +11,10 @@ import { daysInColumn, daysInColumnLabel, shortYearLabel } from './columns';
 /**
  * One applicant, as seen from across the board.
  *
- * FIVE THINGS AND NO MORE: name, year and home department, subteam, how long
+ * A compact summary: name, year and home department, subteam, how long
  * they have sat in this column, and how many notes they have. A card is scanned
- * in about a second while looking for someone to act on, and every field added
- * makes the other four slower to find. Everything else about the applicant —
+ * in about a second while looking for someone to act on. Interview tags are
+ * reviewer metadata, not a replacement for the applicant’s preference. Everything else —
  * their answers, their resume, the full ranking — is one click away in the
  * detail view, which is where reading actually happens.
  *
@@ -106,6 +107,21 @@ export function BoardCard({
           <span className="sr-only">
             {assigned ? ' assigned subteam' : ' first choice subteam'}
           </span>
+        </p>
+      ) : null}
+
+      {card.interviewTags.length > 0 ? (
+        <p className="mt-2 flex flex-wrap gap-1 text-sm" aria-label="Interview tags">
+          <span className="text-muted-foreground">Interview:</span>
+          {card.interviewTags.map((tag) => (
+            <span
+              key={tag.id}
+              className="rounded-sm bg-secondary px-2 py-0.5 text-secondary-foreground"
+            >
+              <span className="sr-only">Interview tag: </span>
+              {interviewTagLabel(tag, teamSlug)}
+            </span>
+          ))}
         </p>
       ) : null}
 

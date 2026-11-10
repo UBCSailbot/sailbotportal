@@ -42,9 +42,8 @@ export default async function TeamBoardPage({ params, searchParams }: PageProps<
       .maybeSingle(),
     supabase
       .from('subteams')
-      .select('id, name, code')
+      .select('id, name, code, active')
       .eq('team_id', team.id)
-      .eq('active', true)
       .order('position'),
   ]);
 
@@ -77,7 +76,9 @@ export default async function TeamBoardPage({ params, searchParams }: PageProps<
 
       <BoardFilterBar
         filters={filters}
-        subteams={subteams ?? []}
+        subteams={(subteams ?? []).filter((subteam) => subteam.active)}
+        interviewSubteams={subteams ?? []}
+        teamSlug={team.slug}
         showSubteamFilter={ranking?.enabled === true}
         basePath={`/admin/${team.slug}`}
       />

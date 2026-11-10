@@ -373,3 +373,42 @@ describe('row visibility', () => {
     expect(await getApplicationDetail(crypto.randomUUID(), softLead)).toBeNull();
   });
 });
+
+describe('interview metadata', () => {
+  it('loads the saved link and retains inactive tags without offering them for a new tag', async () => {
+    const path = subteams['test-detail-path'];
+    const net = subteams['test-detail-net'];
+    const url = 'https://docs.google.com/document/d/interview-fixture/edit';
+    const { error: addError } = await softLead
+      .from('application_interview_tags')
+      .insert({ application_id: applicationId, subteam_id: path });
+    expect(addError).toBeNull();
+    const { error: docError } = await softLead
+      .from('applications')
+      .update({ interview_notes_url: url })
+      .eq('id', applicationId);
+    expect(docError).toBeNull();
+    const { error: inactiveError } = await admin
+      .from('subteams')
+      .update({ active: false })
+      .eq('id', path);
+    expect(inactiveError).toBeNull();
+    try {
+      const detail = await getApplicationDetail(applicationId, softLead);
+      expect(detail!.interviewNotesUrl).toBe(url);
+      expect(detail!.interviewTags.map((tag) => tag.id)).toEqual([path]);
+      expect(detail!.interviewTagOptions.map((tag) => tag.id)).toContain(net);
+      expect(detail!.interviewTagOptions.map((tag) => tag.id)).not.toContain(path);
+      const other = await getApplicationDetail(mechApplicationId, adminUser);
+      expect(other!.interviewTags).toEqual([]);
+      expect(other!.interviewTagOptions).toEqual([]);
+    } finally {
+      await admin.from('application_interview_tags').delete().eq('application_id', applicationId);
+      await admin
+        .from('applications')
+        .update({ interview_notes_url: null })
+        .eq('id', applicationId);
+      await admin.from('subteams').update({ active: true }).eq('id', path);
+    }
+  });
+});
