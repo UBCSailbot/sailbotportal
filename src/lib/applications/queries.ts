@@ -7,7 +7,7 @@ import type { Database } from '@/lib/supabase/types';
  * Two things shape every decision in this file.
  *
  * FIRST, THE BOARD IS A LIST OF CARDS, NOT A LIST OF APPLICATIONS. A card shows
- * compact summaries — identity, subteam preference, interview tags,
+ * compact summaries — identity, subteam preference, interview tags, priority,
  * days-in-column and note count — so this returns those and nothing else. In
  * particular it returns NEITHER `answers` NOR `question_schema_snapshot`. Those
  * two columns are the bulk of an application row: a Software snapshot is eight
@@ -43,6 +43,14 @@ export const APPLICATION_STATUSES = [
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
+/**
+ * A lead's triage label, most urgent first. Stored lowercase; the UI
+ * capitalises. Null on a row means no priority has been set
+ */
+export const APPLICATION_PRIORITIES = ['high', 'medium', 'low'] as const;
+
+export type ApplicationPriority = (typeof APPLICATION_PRIORITIES)[number];
+
 export type BoardSubteam = {
   id: string;
   name: string;
@@ -64,6 +72,8 @@ export type BoardCard = {
    */
   firstChoiceSubteam: BoardSubteam | null;
   status: ApplicationStatus;
+  /** Null until a lead sets one. */
+  priority: ApplicationPriority | null;
   /** What days-in-column is measured from. */
   statusChangedAt: string;
   noteCount: number;
@@ -254,6 +264,7 @@ type BoardRow = {
   year_of_study: string;
   home_department: string;
   status: string;
+  priority: string | null;
   status_changed_at: string;
   assigned_subteam_id: string | null;
   first_choice_subteam_id: string | null;
@@ -306,7 +317,7 @@ export async function getBoardApplications(
   let query = supabase
     .from('applications')
     .select(
-      'id, applicant_name, year_of_study, home_department, status, status_changed_at, ' +
+      'id, applicant_name, year_of_study, home_department, status, priority, status_changed_at, ' +
         'assigned_subteam_id, first_choice_subteam_id, application_notes(count), ' +
         'application_interview_tags(subteam_id)' +
         (filters.interviewSubteamId !== null
@@ -370,6 +381,9 @@ export async function getBoardApplications(
     // The check constraint on `applications.status` is what makes this cast
     // safe; there is no eighth-and-a-half status a row could be holding.
     status: row.status as ApplicationStatus,
+    // Safe for the same reason: the check constraint on `applications.priority`
+    // allows only the three values or null.
+    priority: row.priority as ApplicationPriority | null,
     statusChangedAt: row.status_changed_at,
     noteCount: noteCountOf(row),
     assignedSubteamId: row.assigned_subteam_id,

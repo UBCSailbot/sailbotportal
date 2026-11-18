@@ -161,6 +161,7 @@ export type Database = {
           interview_at: string | null
           interview_notes_url: string | null
           posting_id: string
+          priority: string | null
           question_schema_snapshot: Json
           ranked_subteams: string[]
           resume_path: string | null
@@ -182,6 +183,7 @@ export type Database = {
           interview_at?: string | null
           interview_notes_url?: string | null
           posting_id: string
+          priority?: string | null
           question_schema_snapshot: Json
           ranked_subteams?: string[]
           resume_path?: string | null
@@ -203,6 +205,7 @@ export type Database = {
           interview_at?: string | null
           interview_notes_url?: string | null
           posting_id?: string
+          priority?: string | null
           question_schema_snapshot?: Json
           ranked_subteams?: string[]
           resume_path?: string | null
