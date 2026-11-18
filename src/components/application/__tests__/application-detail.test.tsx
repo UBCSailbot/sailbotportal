@@ -29,6 +29,7 @@ const detail: ApplicationDetail = {
   homeDepartment: 'CPSC',
   resumePath: null,
   status: 'reviewing',
+  priority: null,
   submittedAt: '2026-08-16T12:00:00.000Z',
   rankedSubteams: [],
   assignedSubteam: null,

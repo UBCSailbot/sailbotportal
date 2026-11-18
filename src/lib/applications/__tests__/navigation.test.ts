@@ -9,6 +9,7 @@ function card(id: string, status: BoardCard['status']): BoardCard {
     homeDepartment: 'CPEN',
     firstChoiceSubteam: null,
     status,
+    priority: null,
     statusChangedAt: '2026-08-16T12:00:00.000Z',
     noteCount: 0,
     assignedSubteamId: null,
