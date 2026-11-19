@@ -7,6 +7,7 @@ import { shortYearLabel } from '@/components/board/columns';
 import { NotesPanel } from '@/components/notes/notes-panel';
 import { AnswerView } from './answer-view';
 import { DetailPanes } from './detail-panes';
+import { DetailPriority } from './detail-priority';
 import { ResumeViewer } from './resume-viewer';
 
 /**
@@ -48,6 +49,12 @@ export function ApplicationDetailView({
           <span className="rounded-md border border-border px-2 py-0.5 text-sm">
             {statusLabel(detail.status)}
           </span>
+          <DetailPriority
+            applicationId={detail.id}
+            teamSlug={detail.teamSlug}
+            applicantName={detail.applicantName}
+            priority={detail.priority}
+          />
           <NotesPanel applicationId={detail.id} initialNotes={detail.notes} />
           <nav aria-label="Applicant navigation" className="flex items-center gap-1">
             <ApplicantArrow direction="previous" href={navigation.previousHref} />
