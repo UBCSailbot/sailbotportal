@@ -8,6 +8,9 @@ import type { BoardCard, BoardSubteam } from '@/lib/applications/queries';
 jest.mock('@/app/actions/move-application', () => ({
   moveApplication: jest.fn(async () => ({ ok: true })),
 }));
+jest.mock('@/app/actions/set-application-priority', () => ({
+  setApplicationPriority: jest.fn(async () => ({ ok: true })),
+}));
 
 // Likewise a websocket and a signed-in session. Its own timing rules are
 // covered in use-board-realtime.test.tsx; here it is stubbed so rendering the

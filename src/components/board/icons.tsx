@@ -1,8 +1,8 @@
 /**
- * The board's two icons, inline.
+ * The board's icons, inline.
  *
- * A whole icon package for two glyphs would be a dependency, a bundle, and a
- * version to keep current; these are eight path elements. They follow the
+ * A whole icon package for a handful of glyphs would be a dependency, a bundle,
+ * and a version to keep current; these are a few path elements each. They follow the
  * common 24×24 stroked-outline convention so a designer swapping in a real icon
  * set later finds the same shape and sizing already in place.
  *
@@ -54,6 +54,25 @@ export function UnfoldIcon({ className }: { className?: string }) {
       <path d="M12 20v2" />
       <path d="m19 15 3-3-3-3" />
       <path d="m5 9-3 3 3 3" />
+    </svg>
+  );
+}
+
+/** Set a priority on a card that has none. */
+export function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg {...shared} className={className}>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+/** Marks the selected option in the priority menu. */
+export function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg {...shared} className={className}>
+      <path d="M20 6 9 17l-5-5" />
     </svg>
   );
 }

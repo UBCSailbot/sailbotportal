@@ -2,6 +2,7 @@
 
 import { useDroppable } from '@dnd-kit/core';
 import type {
+  ApplicationPriority,
   BoardCard as BoardCardData,
   BoardSubteam,
   ApplicationStatus,
@@ -36,6 +37,7 @@ export function BoardColumn({
   subteamsById,
   collapsed,
   onToggle,
+  onPriorityChange,
 }: {
   status: ApplicationStatus;
   label: string;
@@ -46,6 +48,7 @@ export function BoardColumn({
   subteamsById: Map<string, BoardSubteam>;
   collapsed: boolean;
   onToggle: () => void;
+  onPriorityChange: (id: string, priority: ApplicationPriority | null) => void;
 }) {
   const count = cards.length;
   const countLabel = `${count} ${count === 1 ? 'applicant' : 'applicants'}`;
@@ -186,6 +189,7 @@ export function BoardColumn({
               boardQuery={boardQuery}
               now={now}
               subteamsById={subteamsById}
+              onPriorityChange={onPriorityChange}
             />
           ))}
         </ul>

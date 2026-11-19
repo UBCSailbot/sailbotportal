@@ -20,6 +20,10 @@ jest.mock('next/link', () => ({
   ),
 }));
 
+jest.mock('@/app/actions/set-application-priority', () => ({
+  setApplicationPriority: jest.fn(async () => ({ ok: true })),
+}));
+
 jest.mock('../resume-viewer', () => ({
   ResumeViewer: () => <div>Resume viewer</div>,
 }));

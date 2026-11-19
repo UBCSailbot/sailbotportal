@@ -5,14 +5,19 @@ import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { interviewTagLabel } from '@/lib/applications/interview-metadata';
 import { appendBoardQuery } from '@/lib/applications/navigation';
-import type { BoardCard as BoardCardData, BoardSubteam } from '@/lib/applications/queries';
+import type {
+  ApplicationPriority,
+  BoardCard as BoardCardData,
+  BoardSubteam,
+} from '@/lib/applications/queries';
 import { daysInColumn, daysInColumnLabel, shortYearLabel } from './columns';
+import { PriorityPicker } from './priority-picker';
 
 /**
  * One applicant, as seen from across the board.
  *
  * A compact summary: name, year and home department, subteam, how long
- * they have sat in this column, and how many notes they have. A card is scanned
+ * they have sat in this column, and how many notes they have, and their priority. A card is scanned
  * in about a second while looking for someone to act on. Interview tags are
  * reviewer metadata, not a replacement for the applicant’s preference. Everything else —
  * their answers, their resume, the full ranking — is one click away in the
@@ -32,6 +37,7 @@ export function BoardCard({
   boardQuery,
   now,
   subteamsById,
+  onPriorityChange,
   overlay = false,
 }: {
   card: BoardCardData;
@@ -41,6 +47,8 @@ export function BoardCard({
   now: string;
   /** Resolves `assignedSubteamId`, which arrives as a bare uuid. */
   subteamsById: Map<string, BoardSubteam>;
+  /** Omitted on the drag overlay, which shows the label but cannot change it. */
+  onPriorityChange?: (id: string, priority: ApplicationPriority | null) => void;
   /**
    * True for the copy rendered inside `DragOverlay`, which follows the cursor
    * and must not register a second draggable under the same id.
@@ -88,12 +96,23 @@ export function BoardCard({
           it can be opened in a new tab, copied, and reached by Tab — and the
           pointer sensor's 5px threshold is what keeps a plain click on it from
           being read as the start of a drag. */}
-      <Link
-        href={appendBoardQuery(`/admin/${teamSlug}/applications/${card.id}`, boardQuery)}
-        className="rounded-sm text-base font-medium hover:underline hover:underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        {card.applicantName}
-      </Link>
+      <div className="flex items-start justify-between gap-2">
+        <Link
+          href={appendBoardQuery(`/admin/${teamSlug}/applications/${card.id}`, boardQuery)}
+          className="rounded-sm text-base font-medium hover:underline hover:underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          {card.applicantName}
+        </Link>
+        <PriorityPicker
+          priority={card.priority}
+          onChange={
+            overlay || !onPriorityChange
+              ? undefined
+              : (priority) => onPriorityChange(card.id, priority)
+          }
+          subject={card.applicantName}
+        />
+      </div>
 
       <p className="mt-1 text-sm text-muted-foreground">
         {shortYearLabel(card.yearOfStudy)} · {card.homeDepartment}
