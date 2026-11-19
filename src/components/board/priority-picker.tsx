@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { APPLICATION_PRIORITIES, type ApplicationPriority } from '@/lib/applications/queries';
 import { CheckIcon, PlusIcon } from './icons';
 
@@ -61,6 +61,7 @@ export function PriorityPicker({
   subject: string;
 }) {
   const [open, setOpen] = useState(false);
+  const headingId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -155,8 +156,13 @@ export function PriorityPicker({
             : `Set priority for ${subject}`
         }
         onClick={() => setOpen((current) => !current)}
-        className={`rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-          priority ? '' : 'p-1 text-muted-foreground hover:bg-accent hover:text-foreground'
+        className={`rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none ${
+          priority
+            ? // The label paints its own background, so an `accent` hover would
+              // sit behind it unseen. Shifting the label itself reads as a
+              // button: darker on a light theme, lighter on a dark one.
+              'hover:brightness-90 dark:hover:brightness-140'
+            : 'p-1 text-muted-foreground hover:bg-accent hover:text-foreground'
         }`}
       >
         {priority ? <PriorityLabel priority={priority} /> : <PlusIcon />}
@@ -165,27 +171,40 @@ export function PriorityPicker({
       {open ? (
         <div
           role="menu"
-          aria-label="Priority"
+          // The visible heading names the menu, so it is announced on opening.
+          aria-labelledby={headingId}
           onKeyDown={onMenuKeyDown}
           // Above the sticky column headers, which sit at z-10.
-          className="absolute top-full right-0 z-20 mt-1 w-36 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
+          className="absolute top-full right-0 z-20 mt-1 w-44 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
         >
+          <p
+            id={headingId}
+            className="mb-1 px-2 pt-1 pb-1.5 text-xs font-medium text-muted-foreground"
+          >
+            Candidate Priority
+          </p>
           {OPTIONS.map((option, index) => (
-            <button
-              key={option.label}
-              ref={(element) => {
-                itemRefs.current[index] = element;
-              }}
-              type="button"
-              role="menuitemradio"
-              aria-checked={option.value === priority}
-              tabIndex={-1}
-              onClick={() => select(option.value)}
-              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none"
-            >
-              <CheckIcon className={option.value === priority ? '' : 'invisible'} />
-              {option.value ? <PriorityLabel priority={option.value} /> : <span>None</span>}
-            </button>
+            <Fragment key={option.label}>
+              {/* None clears rather than sets, so it sits apart from the three
+                  labels. A separator is skipped by the arrow keys. */}
+              {option.value === null ? (
+                <div role="separator" className="mx-1 my-1 h-px bg-border" />
+              ) : null}
+              <button
+                ref={(element) => {
+                  itemRefs.current[index] = element;
+                }}
+                type="button"
+                role="menuitemradio"
+                aria-checked={option.value === priority}
+                tabIndex={-1}
+                onClick={() => select(option.value)}
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent focus:bg-accent focus:outline-none"
+              >
+                <CheckIcon className={option.value === priority ? '' : 'invisible'} />
+                {option.value ? <PriorityLabel priority={option.value} /> : <span>None</span>}
+              </button>
+            </Fragment>
           ))}
         </div>
       ) : null}
