@@ -20,7 +20,7 @@ import { CheckIcon, PlusIcon } from './icons';
  * the document-level listeners below still see them, because they capture.
  */
 
-const PRIORITY_LABELS: Record<ApplicationPriority, string> = {
+export const PRIORITY_LABELS: Record<ApplicationPriority, string> = {
   high: 'High',
   medium: 'Medium',
   low: 'Low',
