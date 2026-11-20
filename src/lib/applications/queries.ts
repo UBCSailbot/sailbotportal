@@ -7,8 +7,8 @@ import type { Database } from '@/lib/supabase/types';
  * Two things shape every decision in this file.
  *
  * FIRST, THE BOARD IS A LIST OF CARDS, NOT A LIST OF APPLICATIONS. A card shows
- * five things — name, year and home department, first-choice subteam,
- * days-in-column, note count — so this returns those and nothing else. In
+ * six things — name, year and home department, first-choice subteam,
+ * days-in-column, note count, priority — so this returns those and nothing else. In
  * particular it returns NEITHER `answers` NOR `question_schema_snapshot`. Those
  * two columns are the bulk of an application row: a Software snapshot is eight
  * questions including a twenty-row skills matrix, and a board of three hundred
@@ -43,6 +43,14 @@ export const APPLICATION_STATUSES = [
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
+/**
+ * A lead's triage label, most urgent first. Stored lowercase; the UI
+ * capitalises. Null on a row means no priority has been set
+ */
+export const APPLICATION_PRIORITIES = ['high', 'medium', 'low'] as const;
+
+export type ApplicationPriority = (typeof APPLICATION_PRIORITIES)[number];
+
 export type BoardSubteam = {
   id: string;
   name: string;
@@ -64,6 +72,8 @@ export type BoardCard = {
    */
   firstChoiceSubteam: BoardSubteam | null;
   status: ApplicationStatus;
+  /** Null until a lead sets one. */
+  priority: ApplicationPriority | null;
   /** What days-in-column is measured from. */
   statusChangedAt: string;
   noteCount: number;
@@ -88,13 +98,25 @@ export type BoardFilters = {
   submittedTo: string | null;
   /** Free text matched against applicant name and email. */
   search: string | null;
+  /** One board column. */
+  status: ApplicationStatus | null;
+  /**
+   * One priority, or `'none'` for applications with no priority set. A string
+   * rather than null for that case, because null already means "not filtering".
+   */
+  priority: PriorityFilter | null;
 };
+
+/** What the priority filter can ask for: a priority, or the absence of one. */
+export type PriorityFilter = ApplicationPriority | 'none';
 
 export const EMPTY_BOARD_FILTERS: BoardFilters = {
   firstChoiceSubteamId: null,
   submittedFrom: null,
   submittedTo: null,
   search: null,
+  status: null,
+  priority: null,
 };
 
 /**
@@ -106,6 +128,8 @@ export const BOARD_FILTER_PARAMS = {
   submittedFrom: 'from',
   submittedTo: 'to',
   search: 'q',
+  status: 'status',
+  priority: 'priority',
 } as const;
 
 /** What Next hands a page as `searchParams`, alongside a plain URLSearchParams. */
@@ -147,13 +171,25 @@ export function parseBoardFilters(input: SearchParamsInput): BoardFilters {
   const from = firstValue(input, BOARD_FILTER_PARAMS.submittedFrom);
   const to = firstValue(input, BOARD_FILTER_PARAMS.submittedTo);
   const search = firstValue(input, BOARD_FILTER_PARAMS.search);
+  const status = firstValue(input, BOARD_FILTER_PARAMS.status);
+  const priority = firstValue(input, BOARD_FILTER_PARAMS.priority);
 
   return {
     firstChoiceSubteamId: subteam !== null && UUID.test(subteam) ? subteam : null,
     submittedFrom: from !== null && isCalendarDay(from) ? from : null,
     submittedTo: to !== null && isCalendarDay(to) ? to : null,
     search: search === null ? null : search.slice(0, MAX_SEARCH_LENGTH),
+    status: isStatus(status) ? status : null,
+    priority: isPriorityFilter(priority) ? priority : null,
   };
+}
+
+function isStatus(value: string | null): value is ApplicationStatus {
+  return (APPLICATION_STATUSES as readonly (string | null)[]).includes(value);
+}
+
+function isPriorityFilter(value: string | null): value is PriorityFilter {
+  return value === 'none' || (APPLICATION_PRIORITIES as readonly (string | null)[]).includes(value);
 }
 
 /**
@@ -176,6 +212,12 @@ export function serialiseBoardFilters(filters: BoardFilters): URLSearchParams {
   if (filters.search !== null) {
     params.set(BOARD_FILTER_PARAMS.search, filters.search);
   }
+  if (filters.status !== null) {
+    params.set(BOARD_FILTER_PARAMS.status, filters.status);
+  }
+  if (filters.priority !== null) {
+    params.set(BOARD_FILTER_PARAMS.priority, filters.priority);
+  }
   return params;
 }
 
@@ -186,7 +228,12 @@ function isCalendarDay(value: string): boolean {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-function startOfDayUtc(day: string): string {
+/**
+ * The instant `day` begins. Exported, with `startOfNextDayUtc`, so the daily
+ * digest counts over exactly the boundaries the board's date filter uses, and
+ * a count always matches the board it links to.
+ */
+export function startOfDayUtc(day: string): string {
   return `${day}T00:00:00.000Z`;
 }
 
@@ -196,7 +243,7 @@ function startOfDayUtc(day: string): string {
  * `<= day` against a timestamptz would silently exclude all but the first
  * instant of it.
  */
-function startOfNextDayUtc(day: string): string {
+export function startOfNextDayUtc(day: string): string {
   const next = new Date(`${day}T00:00:00.000Z`);
   next.setUTCDate(next.getUTCDate() + 1);
   return next.toISOString();
@@ -243,6 +290,7 @@ type BoardRow = {
   year_of_study: string;
   home_department: string;
   status: string;
+  priority: string | null;
   status_changed_at: string;
   assigned_subteam_id: string | null;
   first_choice_subteam_id: string | null;
@@ -294,7 +342,7 @@ export async function getBoardApplications(
   let query = supabase
     .from('applications')
     .select(
-      'id, applicant_name, year_of_study, home_department, status, status_changed_at, ' +
+      'id, applicant_name, year_of_study, home_department, status, priority, status_changed_at, ' +
         'assigned_subteam_id, first_choice_subteam_id, application_notes(count)',
     )
     .eq('posting_id', postingId);
@@ -312,6 +360,16 @@ export async function getBoardApplications(
 
   if (filters.submittedTo !== null) {
     query = query.lt('submitted_at', startOfNextDayUtc(filters.submittedTo));
+  }
+
+  if (filters.status !== null) {
+    query = query.eq('status', filters.status);
+  }
+
+  if (filters.priority === 'none') {
+    query = query.is('priority', null);
+  } else if (filters.priority !== null) {
+    query = query.eq('priority', filters.priority);
   }
 
   if (filters.search !== null) {
@@ -350,6 +408,9 @@ export async function getBoardApplications(
     // The check constraint on `applications.status` is what makes this cast
     // safe; there is no eighth-and-a-half status a row could be holding.
     status: row.status as ApplicationStatus,
+    // Safe for the same reason: the check constraint on `applications.priority`
+    // allows only the three values or null.
+    priority: row.priority as ApplicationPriority | null,
     statusChangedAt: row.status_changed_at,
     noteCount: noteCountOf(row),
     assignedSubteamId: row.assigned_subteam_id,

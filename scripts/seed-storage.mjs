@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
+import { parseEnv } from 'node:util';
 
 /**
  * The half of the development fixtures that SQL cannot write.
@@ -19,15 +20,9 @@ import { readFileSync } from 'node:fs';
  * Run it after `supabase db reset`, which clears the rows but not the bucket.
  */
 
-const env = Object.fromEntries(
-  readFileSync('.env.local', 'utf8')
-    .split('\n')
-    .filter((line) => line.includes('=') && !line.trimStart().startsWith('#'))
-    .map((line) => {
-      const at = line.indexOf('=');
-      return [line.slice(0, at).trim(), line.slice(at + 1).trim()];
-    }),
-);
+// Node's own dotenv parser, so quoted values (as `supabase status -o env`
+// prints them) arrive unquoted, the same as Next reads them.
+const env = parseEnv(readFileSync('.env.local', 'utf8'));
 
 const url = env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRole = env.SUPABASE_SERVICE_ROLE_KEY;

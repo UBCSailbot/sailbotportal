@@ -20,7 +20,10 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.search = '';
-    url.searchParams.set('next', request.nextUrl.pathname);
+    // The query too, so a link with board filters (such as the daily digest's)
+    // still shows the filtered board after signing in. The login page passes
+    // `next` through `safeNextPath`, which keeps it on this site.
+    url.searchParams.set('next', `${request.nextUrl.pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(url);
   }
 

@@ -25,6 +25,7 @@ function card(overrides: Partial<BoardCard>): BoardCard {
     homeDepartment: 'CPEN',
     firstChoiceSubteam: null,
     status: 'applied',
+    priority: null,
     statusChangedAt: '2026-08-01T00:00:00.000Z',
     noteCount: 0,
     assignedSubteamId: null,

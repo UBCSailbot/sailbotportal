@@ -12,6 +12,10 @@ jest.mock('next/link', () => ({
   ),
 }));
 
+jest.mock('@/app/actions/set-application-priority', () => ({
+  setApplicationPriority: jest.fn(async () => ({ ok: true })),
+}));
+
 jest.mock('../resume-viewer', () => ({
   ResumeViewer: () => <div>Resume viewer</div>,
 }));
@@ -29,6 +33,7 @@ const detail: ApplicationDetail = {
   homeDepartment: 'CPSC',
   resumePath: null,
   status: 'reviewing',
+  priority: null,
   submittedAt: '2026-08-16T12:00:00.000Z',
   rankedSubteams: [],
   assignedSubteam: null,

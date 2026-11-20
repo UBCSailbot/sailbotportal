@@ -113,13 +113,16 @@ Copy `.env.example` to `.env.local`, then fill in the local values printed by:
 supabase status -o env
 ```
 
-The required variables are:
+The required variables are below. The CLI prints them under different names, so rename
+them when you copy:
 
-```dotenv
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-```
+| `.env.local` (what the app reads) | `supabase status -o env` prints |
+| --------------------------------- | ------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`        | `API_URL`                       |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | `ANON_KEY`                      |
+| `SUPABASE_SERVICE_ROLE_KEY`       | `SERVICE_ROLE_KEY`              |
+
+The other variables it prints are optional; the app does not read them.
 
 `FREDB_API_KEY` and `FREDB_BASE_URL` are optional. If they are absent or FredDB is
 unavailable, public posting reads fall back to Supabase.
@@ -153,7 +156,24 @@ These credentials exist only in the local seed data:
 - Electrical lead: `elec@sailbot.local` / `test`
 - Mechanical lead: `mech@sailbot.local` / `test`
 
-The seed also creates sample applications, notes, and status events.
+The seed also creates sample applications, notes, and status events. There is no seeded
+admin; to test the all-teams view, promote a lead in Studio's SQL editor (reverted by
+`supabase db reset`):
+
+```sql
+update profiles set role = 'admin' where email = 'soft@sailbot.local';
+```
+
+Useful routes: `/login`, `/apply`, `/admin` (redirects to your board), `/admin/{mech|elec|soft}`,
+and `/admin/postings`.
+
+### Troubleshooting
+
+- **Day to day:** `supabase start` / `supabase stop` keep your data (it lives in Docker
+  volumes); `supabase db reset` wipes and re-seeds, so re-run `npm run db:seed-storage` after.
+
+### Supabase .env
+Check ```.env.exapmle``` for the Supabase env variables that you need. If you run ```npm supabase status -o env``` it will show you the env varaibles that you need and their values. 
 
 ### Windows Supabase caveat
 

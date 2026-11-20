@@ -417,6 +417,7 @@ describe('the card payload', () => {
         code: 'PATH',
       },
       status: 'reviewing',
+      priority: null,
       statusChangedAt: expect.any(String),
       noteCount: 3,
       assignedSubteamId: null,
