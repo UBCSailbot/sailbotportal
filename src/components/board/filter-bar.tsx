@@ -4,6 +4,7 @@ import { interviewTagLabel } from '@/lib/applications/interview-metadata';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import {
+  APPLICATION_PRIORITIES,
   BOARD_FILTER_PARAMS,
   EMPTY_BOARD_FILTERS,
   serialiseBoardFilters,
@@ -11,6 +12,8 @@ import {
   type BoardSubteam,
 } from '@/lib/applications/queries';
 import { controlClasses, smallButtonClasses } from '@/components/apply/question-shell';
+import { BOARD_COLUMNS } from './columns';
+import { PRIORITY_LABELS } from './priority-picker';
 
 /**
  * The board's filter controls.
@@ -115,6 +118,49 @@ export function BoardFilterBar({
           </select>
         </div>
       ) : null}
+
+      {/* One value each, as native selects like the subteam filter. These are
+          also what the daily digest's links set. */}
+      <div>
+        <label htmlFor="board-status" className="block text-sm font-medium">
+          Status
+        </label>
+        <select
+          id="board-status"
+          name={BOARD_FILTER_PARAMS.status}
+          value={draft.status ?? ''}
+          onChange={(event) => set('status', event.target.value)}
+          className={`mt-1 ${controlClasses}`}
+        >
+          <option value="">Any status</option>
+          {BOARD_COLUMNS.map((column) => (
+            <option key={column.status} value={column.status}>
+              {column.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label htmlFor="board-priority" className="block text-sm font-medium">
+          Priority
+        </label>
+        <select
+          id="board-priority"
+          name={BOARD_FILTER_PARAMS.priority}
+          value={draft.priority ?? ''}
+          onChange={(event) => set('priority', event.target.value)}
+          className={`mt-1 ${controlClasses}`}
+        >
+          <option value="">Any priority</option>
+          {APPLICATION_PRIORITIES.map((priority) => (
+            <option key={priority} value={priority}>
+              {PRIORITY_LABELS[priority]}
+            </option>
+          ))}
+          <option value="none">None</option>
+        </select>
+      </div>
 
       <div>
         <label htmlFor="board-interview-tag" className="block text-sm font-medium">
