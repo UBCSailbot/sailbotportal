@@ -73,6 +73,7 @@ export function useBoardRealtime({ postingId, paused }: { postingId: string; pau
 
   useEffect(() => {
     const supabase = createClient();
+    let cancelled = false;
 
     const channel = supabase
       .channel(`board:${postingId}`)
@@ -90,6 +91,7 @@ export function useBoardRealtime({ postingId, paused }: { postingId: string; pau
           filter: `posting_id=eq.${postingId}`,
         },
         () => {
+          if (cancelled) return;
           if (pausedRef.current) {
             // Recorded, not dropped. The drag-end effect above picks it up.
             pending.current = true;
@@ -98,9 +100,37 @@ export function useBoardRealtime({ postingId, paused }: { postingId: string; pau
           scheduleRefresh();
         },
       )
-      .subscribe();
+      .on('system', {}, (payload) => {
+        if (!cancelled && payload.extension === 'postgres_changes' && payload.status === 'ok') {
+          scheduleRefresh();
+        }
+      });
+
+    async function subscribe() {
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (error || !session) {
+          scheduleRefresh();
+          return;
+        }
+        // Joining before auth settles can register an anonymous, permanently silent stream.
+        await supabase.realtime.setAuth(session.access_token);
+        if (!cancelled) channel.subscribe();
+      } catch {
+        if (!cancelled) {
+          console.error('[board] realtime connection could not start');
+          scheduleRefresh();
+        }
+      }
+    }
+    void subscribe();
 
     return () => {
+      cancelled = true;
       if (timer.current !== null) {
         clearTimeout(timer.current);
         timer.current = null;

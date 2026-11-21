@@ -22,6 +22,7 @@ function card(overrides: Partial<BoardCard> = {}): BoardCard {
     statusChangedAt: '2026-08-05T12:00:00.000Z',
     noteCount: 0,
     assignedSubteamId: null,
+    interviewTags: [],
     ...overrides,
   };
 }

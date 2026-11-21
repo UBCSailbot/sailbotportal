@@ -1,3 +1,11 @@
+jest.mock('@/app/actions/set-interview-metadata', () => ({
+  addInterviewTag: jest.fn(),
+  removeInterviewTag: jest.fn(),
+  saveInterviewNotesUrl: jest.fn(),
+}));
+
+jest.mock('next/navigation', () => ({ useRouter: () => ({ refresh: jest.fn() }) }));
+
 import { render, screen, within } from '@testing-library/react';
 import type { ApplicationDetail } from '@/lib/applications/detail';
 import { ApplicationDetailView } from '../application-detail';
@@ -32,6 +40,9 @@ const detail: ApplicationDetail = {
   submittedAt: '2026-08-16T12:00:00.000Z',
   rankedSubteams: [],
   assignedSubteam: null,
+  interviewTags: [],
+  interviewTagOptions: [],
+  interviewNotesUrl: null,
   answers: {},
   questions: [],
   notes: [],

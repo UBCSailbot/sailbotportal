@@ -1,5 +1,6 @@
 'use client';
 
+import { interviewTagLabel } from '@/lib/applications/interview-metadata';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import {
@@ -30,11 +31,15 @@ export function BoardFilterBar({
   filters,
   subteams,
   showSubteamFilter,
+  interviewSubteams,
+  teamSlug,
   basePath,
 }: {
   /** From the URL, so the controls show what the board is actually showing. */
   filters: BoardFilters;
   subteams: BoardSubteam[];
+  interviewSubteams: BoardSubteam[];
+  teamSlug: string;
   /**
    * Only Software ranks subteams. On a board where every first choice is null
    * the control could do nothing but empty the board, so it is not offered.
@@ -44,6 +49,12 @@ export function BoardFilterBar({
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState<BoardFilters>(filters);
+  const source = `${basePath}?${serialiseBoardFilters(filters).toString()}`;
+  const [previousSource, setPreviousSource] = useState(source);
+  if (source !== previousSource) {
+    setPreviousSource(source);
+    setDraft(filters);
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -104,6 +115,26 @@ export function BoardFilterBar({
           </select>
         </div>
       ) : null}
+
+      <div>
+        <label htmlFor="board-interview-tag" className="block text-sm font-medium">
+          Interview tag
+        </label>
+        <select
+          id="board-interview-tag"
+          name={BOARD_FILTER_PARAMS.interviewSubteamId}
+          value={draft.interviewSubteamId ?? ''}
+          onChange={(event) => set('interviewSubteamId', event.target.value)}
+          className={`mt-1 ${controlClasses}`}
+        >
+          <option value="">Any interview tag</option>
+          {interviewSubteams.map((subteam) => (
+            <option key={subteam.id} value={subteam.id}>
+              {interviewTagLabel(subteam, teamSlug)} — {subteam.name}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div>
         <label htmlFor="board-from" className="block text-sm font-medium">

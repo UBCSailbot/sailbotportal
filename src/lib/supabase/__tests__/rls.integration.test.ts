@@ -28,6 +28,7 @@ let softNoteId: string;
 let softEventId: string;
 let mechNoteId: string;
 let mechEventId: string;
+let profileSubteamId: string;
 
 /**
  * Fixture teams are namespaced so they cannot collide with the reference data
@@ -99,6 +100,14 @@ beforeAll(async () => {
   if (teamsError) throw teamsError;
   softTeamId = teams!.find((t) => t.slug === 'test-soft')!.id;
   mechTeamId = teams!.find((t) => t.slug === 'test-mech')!.id;
+
+  const profileSubteam = await admin
+    .from('subteams')
+    .insert({ team_id: mechTeamId, name: 'Profile scope', slug: 'profile-scope' })
+    .select('id')
+    .single();
+  if (profileSubteam.error) throw profileSubteam.error;
+  profileSubteamId = profileSubteam.data!.id;
 
   const { data: postings, error: postingsError } = await admin
     .from('postings')
@@ -438,19 +447,46 @@ describe('application notes and events are append-only', () => {
     expect(data!.map((e) => e.id)).not.toContain(mechEventId);
   });
 
-  it('lead can insert an event on its own team application but not another team', async () => {
+  it('lead cannot fabricate events on either its own or another team application', async () => {
+    const id = crypto.randomUUID();
     const own = await softLead
       .from('application_events')
-      .insert({ application_id: softApplicationId, type: 'note_added' })
+      .insert({
+        id,
+        application_id: softApplicationId,
+        actor_id: mechLeadId,
+        type: 'status_change',
+        from_status: 'applied',
+        to_status: 'offered',
+      })
       .select();
-    expect(own.error).toBeNull();
-    expect(own.data).toHaveLength(1);
+    expect(own.error?.code).toBe('42501');
+    const written = await admin.from('application_events').select('id').eq('id', id);
+    expect(written.error).toBeNull();
+    expect(written.data).toEqual([]);
 
     const cross = await softLead
       .from('application_events')
       .insert({ application_id: mechApplicationId, type: 'note_added' });
     expect(cross.error).not.toBeNull();
     expect(cross.error!.code).toBe('42501');
+  });
+
+  it('authenticated admins cannot fabricate audit events either', async () => {
+    const adminUser = await signedInAs({ email: testEmail('admin-events'), role: 'admin' });
+    const id = crypto.randomUUID();
+    const inserted = await adminUser.from('application_events').insert({
+      id,
+      application_id: softApplicationId,
+      actor_id: softLeadId,
+      type: 'status_change',
+      from_status: 'applied',
+      to_status: 'offered',
+    });
+    expect(inserted.error?.code).toBe('42501');
+    const written = await admin.from('application_events').select('id').eq('id', id);
+    expect(written.error).toBeNull();
+    expect(written.data).toEqual([]);
   });
 
   it('lead cannot insert a note on another team application', async () => {
@@ -583,6 +619,119 @@ describe('admin access', () => {
 });
 
 describe('profile visibility', () => {
+  it.each(['role', 'team_id', 'subteam_id'] as const)(
+    'a lead cannot change its own %s, even with an otherwise allowed name change',
+    async (field) => {
+      const lead = await signedInAs({
+        email: testEmail('profile-guard'),
+        role: 'lead',
+        teamId: softTeamId,
+      });
+      const id = (await lead.auth.getUser()).data.user!.id;
+      const before = await admin
+        .from('profiles')
+        .select('role, team_id, subteam_id, name')
+        .eq('id', id)
+        .single();
+      expect(before.error).toBeNull();
+      const value =
+        field === 'role' ? 'admin' : field === 'team_id' ? mechTeamId : profileSubteamId;
+      const changed = await lead
+        .from('profiles')
+        .update({ [field]: value, name: 'Must not persist' })
+        .eq('id', id);
+      expect(changed.error?.code).toBe('42501');
+      const after = await admin
+        .from('profiles')
+        .select('role, team_id, subteam_id, name')
+        .eq('id', id)
+        .single();
+      expect(after.error).toBeNull();
+      expect(after.data).toEqual(before.data);
+      const crossTeam = await lead.from('applications').select('id').eq('id', mechApplicationId);
+      expect(crossTeam.error).toBeNull();
+      expect(crossTeam.data).toEqual([]);
+    },
+  );
+
+  it('allows a name update with unchanged permission fields', async () => {
+    const changed = await softLead
+      .from('profiles')
+      .update({
+        name: 'Updated lead name',
+        role: 'lead',
+        team_id: softTeamId,
+        subteam_id: null,
+      })
+      .eq('id', softLeadId)
+      .select('name, role, team_id')
+      .single();
+    expect(changed.error).toBeNull();
+    expect(changed.data).toEqual({ name: 'Updated lead name', role: 'lead', team_id: softTeamId });
+  });
+
+  it('does not allow a lead to clear existing team or subteam assignments', async () => {
+    const lead = await signedInAs({
+      email: testEmail('profile-clear'),
+      role: 'lead',
+      teamId: mechTeamId,
+    });
+    const id = (await lead.auth.getUser()).data.user!.id;
+    await admin
+      .from('profiles')
+      .update({ subteam_id: profileSubteamId })
+      .eq('id', id)
+      .throwOnError();
+    for (const field of ['team_id', 'subteam_id']) {
+      const cleared = await lead
+        .from('profiles')
+        .update({ [field]: null })
+        .eq('id', id);
+      expect(cleared.error?.code).toBe('42501');
+    }
+    const after = await admin.from('profiles').select('team_id, subteam_id').eq('id', id).single();
+    expect(after.error).toBeNull();
+    expect(after.data).toEqual({ team_id: mechTeamId, subteam_id: profileSubteamId });
+  });
+
+  it('allows existing admins and service-role administration to manage permissions', async () => {
+    const manager = await signedInAs({ email: testEmail('profile-admin'), role: 'admin' });
+    const target = await signedInAs({
+      email: testEmail('profile-target'),
+      role: 'lead',
+      teamId: softTeamId,
+    });
+    const id = (await target.auth.getUser()).data.user!.id;
+    const managed = await manager
+      .from('profiles')
+      .update({
+        role: 'admin',
+        team_id: mechTeamId,
+        subteam_id: profileSubteamId,
+      })
+      .eq('id', id)
+      .select('role, team_id, subteam_id')
+      .single();
+    expect(managed.error).toBeNull();
+    expect(managed.data).toEqual({
+      role: 'admin',
+      team_id: mechTeamId,
+      subteam_id: profileSubteamId,
+    });
+    const restored = await admin
+      .from('profiles')
+      .update({
+        role: 'lead',
+        team_id: softTeamId,
+        subteam_id: null,
+      })
+      .eq('id', id)
+      .select('role, team_id, subteam_id')
+      .single();
+    expect(restored.error).toBeNull();
+    expect(restored.data).toEqual({ role: 'lead', team_id: softTeamId, subteam_id: null });
+  });
+
   it('authenticated users read profiles but only update their own', async () => {
     const { data, error } = await softLead.from('profiles').select();
     expect(error).toBeNull(); // a recursive policy would error here

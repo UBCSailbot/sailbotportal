@@ -79,6 +79,36 @@ export type Database = {
           },
         ]
       }
+      application_interview_tags: {
+        Row: {
+          application_id: string
+          subteam_id: string
+        }
+        Insert: {
+          application_id: string
+          subteam_id: string
+        }
+        Update: {
+          application_id?: string
+          subteam_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_interview_tags_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_interview_tags_subteam_id_fkey"
+            columns: ["subteam_id"]
+            isOneToOne: false
+            referencedRelation: "subteams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       application_notes: {
         Row: {
           application_id: string
@@ -129,6 +159,7 @@ export type Database = {
           home_department: string
           id: string
           interview_at: string | null
+          interview_notes_url: string | null
           posting_id: string
           question_schema_snapshot: Json
           ranked_subteams: string[]
@@ -149,6 +180,7 @@ export type Database = {
           home_department: string
           id?: string
           interview_at?: string | null
+          interview_notes_url?: string | null
           posting_id: string
           question_schema_snapshot: Json
           ranked_subteams?: string[]
@@ -169,6 +201,7 @@ export type Database = {
           home_department?: string
           id?: string
           interview_at?: string | null
+          interview_notes_url?: string | null
           posting_id?: string
           question_schema_snapshot?: Json
           ranked_subteams?: string[]
