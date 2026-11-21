@@ -391,8 +391,18 @@ it('wakes a second authorized board subscription for both tag addition and remov
   const session = await colleague.auth.getSession();
   await colleague.realtime.setAuth(session.data.session!.access_token);
   let receive: (() => void) | undefined;
+  let joined = false;
+  let postgresReady = false;
+  let subscriptionError: string | undefined;
+  let checkSubscription = () => {};
   const channel = colleague
     .channel(`interview-tags-${row.id}`)
+    .on('system', {}, (payload) => {
+      if (payload.extension !== 'postgres_changes') return;
+      postgresReady = payload.status === 'ok';
+      if (payload.status === 'error') subscriptionError = 'Postgres subscription failed.';
+      checkSubscription();
+    })
     .on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'applications', filter: `id=eq.${row.id}` },
@@ -400,18 +410,25 @@ it('wakes a second authorized board subscription for both tag addition and remov
     );
   const subscribed = new Promise<void>((resolve, reject) => {
     const timer = setTimeout(
-      () => reject(new Error('Realtime subscription did not start.')),
+      () => reject(new Error('Realtime database subscription did not become ready.')),
       12000,
     );
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
+    // Channel join can precede the database subscription on a cold realtime service.
+    checkSubscription = () => {
+      if (subscriptionError) {
+        clearTimeout(timer);
+        reject(new Error(subscriptionError));
+      } else if (joined && postgresReady) {
         clearTimeout(timer);
         resolve();
       }
+    };
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') joined = true;
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        clearTimeout(timer);
-        reject(new Error(`Realtime: ${status}`));
+        subscriptionError = `Realtime: ${status}`;
       }
+      checkSubscription();
     });
   });
   function nextUpdate(label: string) {

@@ -28,12 +28,25 @@ export function InterviewMetadata({
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState('');
-  const [draftUrl, setDraftUrl] = useState(initialNotesUrl ?? '');
+  const [document, setDocument] = useState({
+    savedUrl: initialNotesUrl,
+    draft: initialNotesUrl ?? '',
+    dirty: false,
+  });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const available = tagOptions.filter((option) => !initialTags.some((tag) => tag.id === option.id));
   const link = parseInterviewNotesUrl(initialNotesUrl ?? '');
+
+  // Follow refreshed saved links, but keep anything the lead has actually edited.
+  if (document.savedUrl !== initialNotesUrl) {
+    setDocument({
+      savedUrl: initialNotesUrl,
+      draft: document.dirty ? document.draft : (initialNotesUrl ?? ''),
+      dirty: document.dirty && document.draft !== (initialNotesUrl ?? ''),
+    });
+  }
 
   async function changeTag(subteamId: string, remove: boolean) {
     setPending(true);
@@ -60,6 +73,7 @@ export function InterviewMetadata({
   }
 
   async function saveDocument(value: string) {
+    const observedDocument = document;
     setPending(true);
     setError('');
     setMessage('');
@@ -69,7 +83,12 @@ export function InterviewMetadata({
         setError(result.error);
         return;
       }
-      setDraftUrl(result.url ?? '');
+      // A fresher saved prop can arrive before this action's response.
+      setDocument((current) => ({
+        ...current,
+        draft: current === observedDocument ? (result.url ?? '') : (current.savedUrl ?? ''),
+        dirty: false,
+      }));
       setMessage(result.url ? 'Document link saved.' : 'Document link cleared.');
       router.refresh();
     } catch {
@@ -85,7 +104,7 @@ export function InterviewMetadata({
   }
   function saveLink(event: FormEvent) {
     event.preventDefault();
-    void saveDocument(draftUrl);
+    void saveDocument(document.draft);
   }
 
   return (
@@ -170,9 +189,15 @@ export function InterviewMetadata({
             <input
               id={`interview-doc-${applicationId}`}
               type="url"
-              value={draftUrl}
+              value={document.draft}
               maxLength={2048}
-              onChange={(event) => setDraftUrl(event.target.value)}
+              onChange={(event) =>
+                setDocument({
+                  ...document,
+                  draft: event.target.value,
+                  dirty: true,
+                })
+              }
               aria-describedby={`interview-doc-help-${applicationId}`}
               className={`w-full ${control}`}
               placeholder="https://docs.google.com/document/d/…/edit"
@@ -187,7 +212,7 @@ export function InterviewMetadata({
               </button>
               <button
                 type="button"
-                disabled={!initialNotesUrl && !draftUrl}
+                disabled={!initialNotesUrl && !document.draft}
                 onClick={() => void saveDocument('')}
                 className={control}
               >

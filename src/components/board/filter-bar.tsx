@@ -49,6 +49,12 @@ export function BoardFilterBar({
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState<BoardFilters>(filters);
+  const source = `${basePath}?${serialiseBoardFilters(filters).toString()}`;
+  const [previousSource, setPreviousSource] = useState(source);
+  if (source !== previousSource) {
+    setPreviousSource(source);
+    setDraft(filters);
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
