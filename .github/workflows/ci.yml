@@ -44,8 +44,10 @@ jobs:
           # emits, so `latest` lets an upstream release change this job's inputs
           # on a push that touched nothing near it. This is the version
           # developers run locally; moving it should be a commit someone made on
-          # purpose.
-          version: 2.71.3
+          # purpose. Keep it in step with the `supabase` devDependency in
+          # package.json: v2 and v3 cannot read each other's config.toml (v3
+          # renamed `[inbucket]` to `[local_smtp]` and rejects the old name).
+          version: 3.2.0
 
       - run: npm ci
 
