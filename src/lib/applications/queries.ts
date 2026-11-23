@@ -51,6 +51,17 @@ export const APPLICATION_PRIORITIES = ['high', 'medium', 'low'] as const;
 
 export type ApplicationPriority = (typeof APPLICATION_PRIORITIES)[number];
 
+/**
+ * How each priority is written for people. Here rather than in the picker, so
+ * the board, its filter and the digest email (which is server code and cannot
+ * read values out of a client component) all say the same thing.
+ */
+export const PRIORITY_LABELS: Record<ApplicationPriority, string> = {
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+};
+
 export type BoardSubteam = {
   id: string;
   name: string;

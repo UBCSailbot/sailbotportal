@@ -7,13 +7,13 @@ import {
   APPLICATION_PRIORITIES,
   BOARD_FILTER_PARAMS,
   EMPTY_BOARD_FILTERS,
+  PRIORITY_LABELS,
   serialiseBoardFilters,
   type BoardFilters,
   type BoardSubteam,
 } from '@/lib/applications/queries';
 import { controlClasses, smallButtonClasses } from '@/components/apply/question-shell';
 import { BOARD_COLUMNS } from './columns';
-import { PRIORITY_LABELS } from './priority-picker';
 
 /**
  * The board's filter controls.

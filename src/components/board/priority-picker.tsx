@@ -1,7 +1,11 @@
 'use client';
 
 import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { APPLICATION_PRIORITIES, type ApplicationPriority } from '@/lib/applications/queries';
+import {
+  APPLICATION_PRIORITIES,
+  PRIORITY_LABELS,
+  type ApplicationPriority,
+} from '@/lib/applications/queries';
 import { CheckIcon, PlusIcon } from './icons';
 
 /**
@@ -19,12 +23,6 @@ import { CheckIcon, PlusIcon } from './icons';
  * pick the card up. Pointer and key events are stopped at this control's edge;
  * the document-level listeners below still see them, because they capture.
  */
-
-export const PRIORITY_LABELS: Record<ApplicationPriority, string> = {
-  high: 'High',
-  medium: 'Medium',
-  low: 'Low',
-};
 
 // Whole class names, so Tailwind finds them in the source. The colours are
 // tokens in `globals.css`, with their own dark-mode values.
