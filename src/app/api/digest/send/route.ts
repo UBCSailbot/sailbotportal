@@ -13,18 +13,11 @@ import { sendEmail, type OutgoingEmail } from '@/lib/digest-email/send';
 /**
  * Builds and sends the daily digest emails called on a schedule
  *
- * NO ONE IS SIGNED IN when this runs, so RLS would show it nothing. It reads
- * with the service role instead, which sees every team, and that makes two
- * things this file's responsibility:
+ * Endpoint called by Supabase with bearer token secret to ensure that
+ * no other actors can call this endpoint.
  *
- * - WHO MAY CALL IT. Only a caller holding `EMAIL_SECRET`. Without the check,
- *   anyone who found the URL could make the app email every lead
- * - WHO SEES WHAT. A lead's email is built from their own team's digest only;
- *   only an admin's email covers every team. `getTeamDigest` scopes each count
- *   to one posting, because the service role would not.
- *
- * Each team's digest is built once and shared by its leads and every admin, so
- * the emails sent in one call all agree.
+ * Endpoint checks for bearer token and sends sub-team specific email to
+ * all leads; admins get email containing digest for all sub-teams
  *
  * ## Response
  *

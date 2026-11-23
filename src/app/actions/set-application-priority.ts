@@ -24,6 +24,11 @@ export type SetPriorityResult = { ok: true } | { ok: false; error: string };
 
 const VALID_PRIORITIES: readonly (string | null)[] = [...APPLICATION_PRIORITIES, null];
 
+/**
+ * @param applicationId application who's priority we are setting
+ * @param priority      priority the application will be set to (null for none)
+ * @param teamSlug      team the application belongs to
+ */
 export async function setApplicationPriority(
   applicationId: string,
   priority: string | null,
