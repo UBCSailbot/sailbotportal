@@ -5,7 +5,9 @@ import type { Database } from './types';
 /**
  * Bypasses RLS entirely. Use ONLY for applicant-facing writes, which are
  * anonymous by design, and always after Zod validation plus an explicit
- * check that the target posting is open.
+ * check that the target posting is open. The one other use is the daily
+ * digest send route, which runs with no one signed in and checks its caller's
+ * secret before reading anything.
  *
  * Never import this into a Client Component. The `server-only` package
  * turns that into a build error rather than a leaked key.
