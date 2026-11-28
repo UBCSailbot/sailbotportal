@@ -48,6 +48,8 @@ it('resets every control when navigation changes the URL filters', () => {
         interviewSubteamId: tag.id,
         submittedFrom: '2026-01-01',
         submittedTo: '2026-01-31',
+        priority: null,
+        status: null,
       }}
     />,
   );

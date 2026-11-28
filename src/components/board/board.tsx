@@ -13,11 +13,13 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import type {
+  ApplicationPriority,
   BoardCard as BoardCardData,
   BoardSubteam,
   ApplicationStatus,
 } from '@/lib/applications/queries';
 import { moveApplication } from '@/app/actions/move-application';
+import { setApplicationPriority } from '@/app/actions/set-application-priority';
 import { BOARD_COLUMNS, DEFAULT_COLLAPSED, groupByStatus } from './columns';
 import { BoardColumn } from './column';
 import { BoardCard } from './card';
@@ -34,6 +36,11 @@ import { useBoardRealtime } from './use-board-realtime';
  * value is derived from the `cards` prop, so when a move fails and the server
  * never revalidates, the card returns to its column the moment the transition
  * ends. There is no second copy of the truth to get out of step.
+ *
+ * Priority changes go through the SAME optimistic reducer rather than a second
+ * one. Two optimistic layers over one `cards` array would each be derived from
+ * the prop alone, so a move and a priority change in flight together would hide
+ * each other.
  *
  * `now` comes from the server render rather than from `Date.now()` here, so the
  * days-in-column figures are identical on both sides of hydration. See
@@ -64,10 +71,14 @@ export function Board({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [optimisticCards, applyMove] = useOptimistic(
+  const [optimisticCards, applyOptimistic] = useOptimistic(
     cards,
-    (state: BoardCardData[], move: { id: string; status: ApplicationStatus; movedAt: string }) =>
-      applyOptimisticMove(state, move, move.movedAt),
+    (state: BoardCardData[], action: OptimisticAction) =>
+      action.type === 'move'
+        ? applyOptimisticMove(state, action, action.movedAt)
+        : state.map((card) =>
+            card.id === action.id ? { ...card, priority: action.priority } : card,
+          ),
   );
 
   // Held while a card is in the air: a board that resorts mid-drag moves the
@@ -122,11 +133,23 @@ export function Board({
     startTransition(async () => {
       // Read once, here, so the reducer stays pure and every re-run of it
       // places the card identically.
-      applyMove({ ...move, movedAt: new Date().toISOString() });
+      applyOptimistic({ type: 'move', ...move, movedAt: new Date().toISOString() });
       const result = await moveApplication(move.id, move.status, teamSlug);
       // On failure nothing is revalidated, so the `cards` prop never changes
       // and the optimistic value falls back to it when the transition ends —
       // the card returns to its old column on its own.
+      if (!result.ok) setError(result.error);
+    });
+  }
+
+  function handlePriorityChange(id: string, priority: ApplicationPriority | null) {
+    setError(null);
+
+    // The same shape as a move: the label changes now, and on failure the
+    // `cards` prop never changes, so it falls back to the old one on its own.
+    startTransition(async () => {
+      applyOptimistic({ type: 'priority', id, priority });
+      const result = await setApplicationPriority(id, priority, teamSlug);
       if (!result.ok) setError(result.error);
     });
   }
@@ -218,6 +241,7 @@ export function Board({
                 subteamsById={subteamsById}
                 collapsed={collapsed.has(column.status)}
                 onToggle={() => toggle(column.status)}
+                onPriorityChange={handlePriorityChange}
               />
             ))}
           </div>
@@ -249,6 +273,10 @@ export function Board({
     </>
   );
 }
+
+type OptimisticAction =
+  | { type: 'move'; id: string; status: ApplicationStatus; movedAt: string }
+  | { type: 'priority'; id: string; priority: ApplicationPriority | null };
 
 function labelOf(status: string | number): string {
   return BOARD_COLUMNS.find((column) => column.status === status)?.label ?? String(status);

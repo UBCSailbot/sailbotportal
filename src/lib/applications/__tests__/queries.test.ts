@@ -32,6 +32,8 @@ describe('parseBoardFilters', () => {
       submittedFrom: '2026-01-01',
       submittedTo: '2026-02-28',
       search: 'jane',
+      status: null,
+      priority: null,
     });
   });
 
@@ -55,7 +57,7 @@ describe('parseBoardFilters', () => {
     const filters = parseBoardFilters(
       params({
         q: 'jane',
-        status: 'rejected',
+        stage: 'rejected',
         order: 'applicant_email.desc',
         limit: '1000',
         select: '*',
@@ -121,6 +123,8 @@ describe('serialiseBoardFilters', () => {
       submittedFrom: '2026-01-01',
       submittedTo: '2026-02-28',
       search: 'jane chen',
+      status: null,
+      priority: null,
     };
 
     const serialised = serialiseBoardFilters(filters);
@@ -139,6 +143,8 @@ describe('serialiseBoardFilters', () => {
       firstChoiceSubteamId: SUBTEAM,
       interviewSubteamId: null,
       submittedFrom: '2026-01-01',
+      status: null,
+      priority: null,
     };
     expect(serialiseBoardFilters(filters).toString()).toBe(
       serialiseBoardFilters({ ...filters }).toString(),
@@ -153,6 +159,8 @@ describe('serialiseBoardFilters', () => {
       submittedFrom: '2026-01-01',
       submittedTo: '2026-02-28',
       search: 'a_b + c%',
+      status: null,
+      priority: null,
     };
     expect(parseBoardFilters(serialiseBoardFilters(filters))).toEqual(filters);
   });

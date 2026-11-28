@@ -3,7 +3,7 @@ import type { Database } from '@/lib/supabase/types';
 import { validateQuestion } from '@/lib/questions/validate';
 import type { AnswerMap, Question } from '@/lib/questions/types';
 import { getApplicationNotes, type ApplicationNote } from './notes';
-import type { ApplicationStatus, BoardSubteam } from './queries';
+import type { ApplicationPriority, ApplicationStatus, BoardSubteam } from './queries';
 
 /**
  * One application, in full.
@@ -54,6 +54,8 @@ export type ApplicationDetail = {
   homeDepartment: string;
   resumePath: string | null;
   status: ApplicationStatus;
+  /** Null until a lead sets one. */
+  priority: ApplicationPriority | null;
   submittedAt: string;
   /** In the applicant's own order of preference. Empty for teams that do not rank. */
   rankedSubteams: BoardSubteam[];
@@ -90,6 +92,7 @@ type DetailRow = {
   answers: unknown;
   question_schema_snapshot: unknown;
   status: string;
+  priority: string | null;
   assigned_subteam_id: string | null;
   interview_notes_url: string | null;
   application_interview_tags: { subteam_id: string }[];
@@ -110,7 +113,7 @@ export async function getApplicationDetail(
         // `question_schema` is deliberately NOT selected. The questions come from
         // `question_schema_snapshot` above; not fetching the live column means the
         // "simplification" that would break this cannot be made by accident.
-        'status, assigned_subteam_id, interview_notes_url, submitted_at, ' +
+        'status, priority, assigned_subteam_id, interview_notes_url, submitted_at, ' +
         'application_interview_tags(subteam_id), postings(title, team_id, teams(slug))',
     )
     .eq('id', applicationId)
@@ -149,6 +152,8 @@ export async function getApplicationDetail(
     homeDepartment: row.home_department,
     resumePath: row.resume_path,
     status: row.status as ApplicationStatus,
+    // The check constraint on `applications.priority` makes this cast safe.
+    priority: row.priority as ApplicationPriority | null,
     submittedAt: row.submitted_at,
     // Mapped through the ranked order rather than the order the lookup
     // returned: `ranked_subteams[0]` is the first choice and that is the whole

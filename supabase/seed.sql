@@ -18,6 +18,7 @@
 --   * three local sign-in accounts, one lead per team
 --   * 40 applications across the three real postings and all eight statuses
 --   * notes and events on a handful of them
+--   * a priority on a minority of them, per team: fewest high, more low
 --
 -- CONVENTIONS THAT ARE LOAD-BEARING, NOT DECORATIVE
 --
@@ -450,6 +451,36 @@ join applications a on a.posting_id = p.id and a.applicant_email = n.email
 join profiles author on author.email = n.author_email;
 
 -- ---------------------------------------------------------------------------
+-- Priorities on a minority
+-- ---------------------------------------------------------------------------
+-- Most cards stay unprioritised, because that is the normal state of a board.
+-- Spread across statuses so labels show up in more than one column. Marcus Webb
+-- gets a different priority on each team: priority belongs to the application,
+-- not the applicant, and a fixture where his two rows agreed could not show it.
+update applications a
+set priority = v.priority
+from (values
+  ('soft-2026', 'daniel_okafor@student.ubc.ca',    'high'),
+  ('soft-2026', 'leo_fernandes@student.ubc.ca',    'medium'),
+  ('soft-2026', 'emily_zhao@student.ubc.ca',       'medium'),
+  ('soft-2026', 'marcus_webb@student.ubc.ca',      'low'),
+  ('soft-2026', 'yuki_tanaka@student.ubc.ca',      'low'),
+  ('soft-2026', 'chris_bell@student.ubc.ca',       'low'),
+  ('mech-2026', 'marcus_webb@student.ubc.ca',      'high'),
+  ('mech-2026', 'rachel_kim@student.ubc.ca',       'medium'),
+  ('mech-2026', 'kevin_park@student.ubc.ca',       'low'),
+  ('mech-2026', 'ryan_doucette@student.ubc.ca',    'low'),
+  ('elec-2026', 'hannah_weiss@student.ubc.ca',     'high'),
+  ('elec-2026', 'diego_morales@student.ubc.ca',    'medium'),
+  ('elec-2026', 'alex_tran@student.ubc.ca',        'low'),
+  ('elec-2026', 'patrick_sullivan@student.ubc.ca', 'low')
+) as v(posting_slug, email, priority)
+join postings p on p.slug = v.posting_slug
+where a.posting_id = p.id
+  and a.applicant_email = v.email
+  and a.submission_id::text like 'fbfbfbfb-0000-4000-8000-%';
+
+-- ---------------------------------------------------------------------------
 -- Events
 -- ---------------------------------------------------------------------------
 -- Every application gets its submission, and everything that has moved gets the
@@ -500,6 +531,7 @@ declare
   v_events         int;
   v_accounts       int;
   v_bad_keys       int;
+  v_prioritised    int;
   r                record;
 begin
   select count(*) into v_total
@@ -632,6 +664,33 @@ begin
     raise exception 'expected 3 local accounts with the right roles and teams, found %', v_accounts;
   end if;
 
+  -- Every posting has all three priorities in the intended shape, and still a
+  -- majority with none. Without the majority check the board stops looking like
+  -- a real one; without the per-value counts a renamed fixture email silently
+  -- drops a label.
+  for r in
+    select
+      p.slug,
+      count(*) filter (where a.priority = 'high')   as high,
+      count(*) filter (where a.priority = 'medium') as medium,
+      count(*) filter (where a.priority = 'low')    as low,
+      count(*) filter (where a.priority is null)    as none
+    from applications a
+    join postings p on p.id = a.posting_id
+    where a.submission_id::text like 'fbfbfbfb-0000-4000-8000-%'
+    group by p.slug
+  loop
+    if not (r.high >= 1 and r.high <= r.medium and r.medium < r.low and r.none > r.high + r.medium + r.low) then
+      raise exception 'posting % priorities wrong: high=% medium=% low=% none=%',
+        r.slug, r.high, r.medium, r.low, r.none;
+    end if;
+  end loop;
+
+  select count(*) into v_prioritised
+  from applications
+  where submission_id::text like 'fbfbfbfb-0000-4000-8000-%'
+    and priority is not null;
+
   raise notice '--- dev fixtures ------------------------------------------';
   raise notice 'applications: % (soft %, mech %, elec %)', v_total, v_soft, v_mech, v_elec;
   for r in
@@ -643,7 +702,7 @@ begin
   loop
     raise notice '  % %', rpad(r.status, 22), r.n;
   end loop;
-  raise notice 'notes: %  events: %', v_notes, v_events;
+  raise notice 'notes: %  events: %  prioritised: %', v_notes, v_events, v_prioritised;
   raise notice 'submissions spanning two teams: %  repeat applicants: %', v_shared_subs, v_repeat_emails;
   raise notice 'sign in as soft@ / elec@ / mech@sailbot.local, password test';
   raise notice '-----------------------------------------------------------';
